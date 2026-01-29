@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能客服系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a56db',
+                        secondary: '#0e9f6e',
+                        neutral: {
+                            100: '#f3f4f6',
+                            200: '#e5e7eb',
+                            300: '#d1d5db',
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            600: '#4b5563',
+                            700: '#374151',
+                            800: '#1f2937',
+                            900: '#111827',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'card': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    },
+                },
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-thin {
+                scrollbar-width: thin;
+            }
+            .scrollbar-thin::-webkit-scrollbar {
+                width: 4px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 2px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb {
+                background: #d1d5db;
+                border-radius: 2px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+                background: #9ca3af;
+            }
+            .transition-all-300 {
+                transition: all 0.3s ease;
+            }
+            .text-balance {
+                text-wrap: balance;
+            }
+        }
+    </style>
+</head>
+<body class="bg-neutral-100 font-sans text-neutral-800">
+    <div class="min-h-screen flex flex-col">
+        <!-- 头部 -->
+        <header class="bg-white border-b border-neutral-200 sticky top-0 z-10">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white">
+                        <i class="fa fa-comments text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-semibold text-neutral-900">智能客服系统</h1>
+                        <p class="text-xs text-neutral-500">本地部署 · 安全可靠</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="upload-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all-300">
+                        <i class="fa fa-upload mr-2"></i>
+                        <span>上传文档</span>
+                    </button>
+                    <button id="knowledge-btn" class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md text-neutral-700 bg-white hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all-300">
+                        <i class="fa fa-book mr-2"></i>
+                        <span>知识库预览</span>
+                    </button>
+                    <button id="stats-btn" class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md text-neutral-700 bg-white hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all-300">
+                        <i class="fa fa-bar-chart mr-2"></i>
+                        <span>系统统计</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容 -->
+        <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- 左侧：聊天区域 -->
+                <div class="lg:col-span-8 space-y-6">
+                    <!-- 聊天卡片 -->
+                    <div class="bg-white rounded-xl shadow-card overflow-hidden transition-all-300 hover:shadow-card-hover">
+                        <div class="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 rounded-full bg-secondary animate-pulse"></div>
+                                <h2 class="text-base font-medium text-neutral-900">智能客服对话</h2>
+                            </div>
+                            <div class="text-xs text-neutral-500">
+                                <i class="fa fa-circle text-secondary text-xs mr-1"></i>
+                                在线
+                            </div>
+                        </div>
+                        <div id="chat-container" class="px-6 py-4 h-[600px] overflow-y-auto scrollbar-thin">
+                            <!-- 系统欢迎消息 -->
+                            <div class="flex mb-6">
+                                <div class="flex-shrink-0 mr-3">
+                                    <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
+                                        <i class="fa fa-robot text-sm"></i>
+                                    </div>
+                                </div>
+                                <div class="bg-neutral-100 rounded-lg p-4 max-w-[80%] border border-neutral-200">
+                                    <p class="text-sm text-neutral-700 text-balance">您好！我是您的智能客服助手，请问有什么可以帮助您的？</p>
+                                    <p class="text-xs text-neutral-500 mt-2">系统 · 刚刚</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="px-6 py-4 border-t border-neutral-200">
+                            <form id="query-form" class="flex space-x-3">
+                                <input type="text" id="user-query" placeholder="请输入您的问题..." class="flex-grow px-4 py-2 border border-neutral-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all-300">
+                                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all-300">
+                                    <i class="fa fa-paper-plane"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- 快速问题 -->
+                    <div class="bg-white rounded-xl shadow-card p-6 transition-all-300 hover:shadow-card-hover">
+                        <h3 class="text-sm font-medium text-neutral-900 mb-4">快速问题</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                如何申请退款？
+                            </button>
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                配送时间需要多久？
+                            </button>
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                商品价格是否包含税费？
+                            </button>
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                如何修改订单信息？
+                            </button>
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                如何查询订单状态？
+                            </button>
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                商品是否支持退换货？
+                            </button>
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                如何联系客服？
+                            </button>
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                会员积分规则是什么？
+                            </button>
+                            <button class="quick-question px-4 py-3 border border-neutral-200 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50 hover:border-primary transition-all-300">
+                                优惠码如何使用？
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧：信息面板 -->
+                <div class="lg:col-span-4 space-y-6">
+                    <!-- 执行过程 -->
+                    <div class="bg-white rounded-xl shadow-card overflow-hidden transition-all-300 hover:shadow-card-hover">
+                        <div class="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
+                            <h3 class="text-sm font-medium text-neutral-900">处理过程</h3>
+                            <button id="toggle-execution" class="text-neutral-500 hover:text-neutral-700 transition-all-300">
+                                <i class="fa fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div id="execution-panel" class="px-6 py-4 max-h-[300px] overflow-y-auto scrollbar-thin">
+                            <div class="flex items-center justify-center py-12 text-neutral-400">
+                                <div class="text-center">
+                                    <i class="fa fa-info-circle text-2xl mb-2"></i>
+                                    <p class="text-sm">处理过程将显示在这里</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 反馈 -->
+                    <div class="bg-white rounded-xl shadow-card overflow-hidden transition-all-300 hover:shadow-card-hover">
+                        <div class="px-6 py-4 border-b border-neutral-200">
+                            <h3 class="text-sm font-medium text-neutral-900">反馈</h3>
+                        </div>
+                        <div id="feedback-panel" class="px-6 py-4">
+                            <div class="flex items-center justify-center py-8 text-neutral-400">
+                                <div class="text-center">
+                                    <i class="fa fa-comment-o text-2xl mb-2"></i>
+                                    <p class="text-sm">请先提交查询，然后在此提供反馈</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 系统信息 -->
+                    <div class="bg-white rounded-xl shadow-card overflow-hidden transition-all-300 hover:shadow-card-hover">
+                        <div class="px-6 py-4 border-b border-neutral-200">
+                            <h3 class="text-sm font-medium text-neutral-900">系统信息</h3>
+                        </div>
+                        <div class="px-6 py-4">
+                            <ul class="space-y-2 text-xs text-neutral-600">
+                                <li class="flex justify-between">
+                                    <span>模型:</span>
+                                    <span class="font-medium">Qwen3-8b (本地)</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span>嵌入模型:</span>
+                                    <span class="font-medium">Qwen3-Embedding</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span>检索策略:</span>
+                                    <span class="font-medium">混合检索</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span>Agent 框架:</span>
+                                    <span class="font-medium">Plan-and-Execute + ReAct</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span>安全级别:</span>
+                                    <span class="font-medium text-secondary">本地部署</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 底部 -->
+        <footer class="bg-white border-t border-neutral-200 py-6">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="flex items-center space-x-2 mb-4 md:mb-0">
+                        <div class="w-6 h-6 rounded bg-primary flex items-center justify-center text-white">
+                            <i class="fa fa-comments text-xs"></i>
+                        </div>
+                        <span class="text-sm text-neutral-600">智能客服系统 © 2026</span>
+                    </div>
+                    <div class="flex items-center space-x-6">
+                        <a href="#" class="text-sm text-neutral-500 hover:text-primary transition-all-300">使用指南</a>
+                        <a href="#" class="text-sm text-neutral-500 hover:text-primary transition-all-300">隐私政策</a>
+                        <a href="#" class="text-sm text-neutral-500 hover:text-primary transition-all-300">联系我们</a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 上传文档模态框 -->
+    <div id="upload-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md transform transition-all duration-300 scale-95 opacity-0" id="upload-modal-content">
+            <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center">
+                <h3 class="text-base font-medium text-neutral-900">上传文档</h3>
+                <button id="close-upload-modal" class="text-neutral-400 hover:text-neutral-500 transition-all-300">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <form id="upload-form" class="px-6 py-6 space-y-4">
+                <div>
+                    <label for="document-type" class="block text-sm font-medium text-neutral-700 mb-1">文档类型</label>
+                    <select id="document-type" class="w-full px-3 py-2 border border-neutral-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all-300">
+                        <option value="faq">常见问题(FAQ)</option>
+                        <option value="company">公司信息</option>
+                        <option value="terms">服务条款</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="file-input" class="block text-sm font-medium text-neutral-700 mb-1">选择文件</label>
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-neutral-300 border-dashed rounded-lg">
+                        <div class="space-y-1 text-center">
+                            <i class="fa fa-cloud-upload text-neutral-400 text-3xl mb-2"></i>
+                            <div class="flex text-sm text-neutral-600">
+                                <label for="file-input" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary/90 focus-within:outline-none">
+                                    <span>上传文件</span>
+                                    <input id="file-input" name="file" type="file" class="sr-only" accept=".pdf,.txt,.docx,.doc,.xlsx,.xls">
+                                </label>
+                                <p class="pl-1">或拖放文件</p>
+                            </div>
+                            <p class="text-xs text-neutral-500">PDF, TXT, Word, Excel 文件 (最大 10MB)</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" id="cancel-upload" class="px-4 py-2 border border-neutral-300 rounded-lg shadow-sm text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all-300">
+                        取消
+                    </button>
+                    <button type="submit" class="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all-300">
+                        上传
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 系统统计模态框 -->
+    <div id="stats-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl transform transition-all duration-300 scale-95 opacity-0" id="stats-modal-content">
+            <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center">
+                <h3 class="text-base font-medium text-neutral-900">系统统计</h3>
+                <button id="close-stats-modal" class="text-neutral-400 hover:text-neutral-500 transition-all-300">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div id="stats-content" class="px-6 py-6 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <h4 class="text-xs font-medium text-neutral-500 mb-2">知识库状态</h4>
+                        <p class="text-2xl font-semibold text-neutral-900">3 个文档</p>
+                        <p class="text-xs text-neutral-500 mt-1">包含 FAQ、公司信息、服务条款</p>
+                    </div>
+                    <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <h4 class="text-xs font-medium text-neutral-500 mb-2">系统状态</h4>
+                        <p class="text-2xl font-semibold text-neutral-900">正常运行</p>
+                        <p class="text-xs text-neutral-500 mt-1">本地模型已加载</p>
+                    </div>
+                    <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <h4 class="text-xs font-medium text-neutral-500 mb-2">反馈统计</h4>
+                        <p class="text-2xl font-semibold text-neutral-900">0 条反馈</p>
+                        <p class="text-xs text-neutral-500 mt-1">等待用户反馈</p>
+                    </div>
+                </div>
+                <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                    <h4 class="text-xs font-medium text-neutral-500 mb-3">系统信息</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-xs text-neutral-600">模型:</span>
+                            <span class="text-xs font-medium text-neutral-900">Qwen3-8b (本地)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-xs text-neutral-600">嵌入模型:</span>
+                            <span class="text-xs font-medium text-neutral-900">Qwen3-Embedding</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-xs text-neutral-600">检索策略:</span>
+                            <span class="text-xs font-medium text-neutral-900">混合检索 (向量 60% + 关键词 40%)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-xs text-neutral-600">Agent 框架:</span>
+                            <span class="text-xs font-medium text-neutral-900">Plan-and-Execute + ReAct</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 知识库预览模态框 -->
+    <div id="knowledge-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] transform transition-all duration-300 scale-95 opacity-0" id="knowledge-modal-content">
+            <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center">
+                <h3 class="text-base font-medium text-neutral-900">知识库预览</h3>
+                <button id="close-knowledge-modal" class="text-neutral-400 hover:text-neutral-500 transition-all-300">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div id="knowledge-content" class="px-6 py-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <div class="flex items-center justify-center py-12 text-neutral-400">
+                    <div class="text-center">
+                        <i class="fa fa-book text-4xl mb-4"></i>
+                        <p class="text-sm">加载知识库内容中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentQueryId = null;
+        const queryForm = document.getElementById('query-form');
+        const userQuery = document.getElementById('user-query');
+        const chatContainer = document.getElementById('chat-container');
+        const uploadBtn = document.getElementById('upload-btn');
+        const uploadModal = document.getElementById('upload-modal');
+        const uploadModalContent = document.getElementById('upload-modal-content');
+        const closeUploadModal = document.getElementById('close-upload-modal');
+        const uploadForm = document.getElementById('upload-form');
+        const cancelUpload = document.getElementById('cancel-upload');
+        const knowledgeBtn = document.getElementById('knowledge-btn');
+        const knowledgeModal = document.getElementById('knowledge-modal');
+        const knowledgeModalContent = document.getElementById('knowledge-modal-content');
+        const closeKnowledgeModal = document.getElementById('close-knowledge-modal');
+        const knowledgeContent = document.getElementById('knowledge-content');
+        const statsBtn = document.getElementById('stats-btn');
+        const statsModal = document.getElementById('stats-modal');
+        const statsModalContent = document.getElementById('stats-modal-content');
+        const closeStatsModal = document.getElementById('close-stats-modal');
+        const statsContent = document.getElementById('stats-content');
+        const toggleExecution = document.getElementById('toggle-execution');
+        const executionPanel = document.getElementById('execution-panel');
+        const feedbackPanel = document.getElementById('feedback-panel');
+        const quickQuestions = document.querySelectorAll('.quick-question');
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 表单提交事件
+            queryForm.addEventListener('submit', handleQuerySubmit);
+            uploadForm.addEventListener('submit', handleFileUpload);
+
+            // 快速问题点击
+            quickQuestions.forEach(button => {
+                button.addEventListener('click', function() {
+                    userQuery.value = this.textContent.trim();
+                    queryForm.dispatchEvent(new Event('submit'));
+                });
+            });
+
+            // 模态框控制
+            uploadBtn.addEventListener('click', () => {
+                uploadModal.classList.remove('hidden');
+                setTimeout(() => {
+                    uploadModalContent.classList.remove('scale-95', 'opacity-0');
+                    uploadModalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            });
+
+            function closeUploadModalFunc() {
+                uploadModalContent.classList.remove('scale-100', 'opacity-100');
+                uploadModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    uploadModal.classList.add('hidden');
+                }, 300);
+            }
+
+            closeUploadModal.addEventListener('click', closeUploadModalFunc);
+            cancelUpload.addEventListener('click', closeUploadModalFunc);
+
+            // 知识库预览
+            knowledgeBtn.addEventListener('click', () => {
+                knowledgeModal.classList.remove('hidden');
+                setTimeout(() => {
+                    knowledgeModalContent.classList.remove('scale-95', 'opacity-0');
+                    knowledgeModalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+                fetchKnowledgeBase();
+            });
+
+            function closeKnowledgeModalFunc() {
+                knowledgeModalContent.classList.remove('scale-100', 'opacity-100');
+                knowledgeModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    knowledgeModal.classList.add('hidden');
+                }, 300);
+            }
+
+            closeKnowledgeModal.addEventListener('click', closeKnowledgeModalFunc);
+
+            statsBtn.addEventListener('click', () => {
+                statsModal.classList.remove('hidden');
+                setTimeout(() => {
+                    statsModalContent.classList.remove('scale-95', 'opacity-0');
+                    statsModalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+                fetchStats();
+            });
+
+            function closeStatsModalFunc() {
+                statsModalContent.classList.remove('scale-100', 'opacity-100');
+                statsModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    statsModal.classList.add('hidden');
+                }, 300);
+            }
+
+            closeStatsModal.addEventListener('click', closeStatsModalFunc);
+
+            // 执行面板切换
+            let executionPanelVisible = true;
+            toggleExecution.addEventListener('click', function() {
+                const icon = this.querySelector('i');
+                if (executionPanelVisible) {
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                    executionPanel.style.maxHeight = '0';
+                    executionPanel.style.overflow = 'hidden';
+                    executionPanel.style.paddingTop = '0';
+                    executionPanel.style.paddingBottom = '0';
+                } else {
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                    executionPanel.style.maxHeight = '300px';
+                    executionPanel.style.overflow = 'auto';
+                    executionPanel.style.paddingTop = '1rem';
+                    executionPanel.style.paddingBottom = '1rem';
+                }
+                executionPanelVisible = !executionPanelVisible;
+            });
+
+            // 点击模态框外部关闭
+            uploadModal.addEventListener('click', function(e) {
+                if (e.target === uploadModal) {
+                    closeUploadModalFunc();
+                }
+            });
+
+            knowledgeModal.addEventListener('click', function(e) {
+                if (e.target === knowledgeModal) {
+                    closeKnowledgeModalFunc();
+                }
+            });
+
+            statsModal.addEventListener('click', function(e) {
+                if (e.target === statsModal) {
+                    closeStatsModalFunc();
+                }
+            });
+        });
+
+        // 获取知识库内容
+        async function fetchKnowledgeBase() {
+            try {
+                // 获取知识库内容
+                const response = await fetch('/api/knowledge-base');
+                const knowledgeData = await response.json();
+                
+                // 构建知识库内容HTML
+                let html = `<div class="space-y-6">`;
+                
+                // 添加文档列表
+                html += `
+                    <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <h4 class="text-sm font-medium text-neutral-900 mb-3">知识库文档</h4>
+                        <div class="space-y-2">
+                `;
+                
+                if (knowledgeData.documents && knowledgeData.documents.length > 0) {
+                    knowledgeData.documents.forEach(doc => {
+                        let icon = 'fa-file';
+                        let color = 'text-neutral-600';
+                        
+                        // 根据文件扩展名设置图标和颜色
+                        if (doc.endsWith('.xlsx') || doc.endsWith('.xls')) {
+                            icon = 'fa-file-excel-o';
+                            color = 'text-green-600';
+                        } else if (doc.endsWith('.docx') || doc.endsWith('.doc')) {
+                            icon = 'fa-file-word-o';
+                            color = 'text-blue-600';
+                        } else if (doc.endsWith('.pdf')) {
+                            icon = 'fa-file-pdf-o';
+                            color = 'text-red-600';
+                        } else if (doc.endsWith('.txt')) {
+                            icon = 'fa-file-text-o';
+                            color = 'text-gray-600';
+                        }
+                        
+                        html += `
+                            <div class="flex items-center p-2 bg-white rounded-lg border border-neutral-100">
+                                <i class="fa ${icon} ${color} mr-2"></i>
+                                <span class="text-sm text-neutral-900">${doc}</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<p class="text-xs text-neutral-500">暂无文档</p>`;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+                
+                // 添加常见问题
+                html += `
+                    <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <h4 class="text-sm font-medium text-neutral-900 mb-3">常见问题 (FAQ)</h4>
+                        <div class="space-y-3">
+                            <div class="p-3 bg-white rounded-lg border border-neutral-100">
+                                <h5 class="text-sm font-medium text-neutral-900 mb-1">如何申请退款？</h5>
+                                <p class="text-xs text-neutral-600">您可以通过以下步骤申请退款：1. 登录账户 2. 进入订单管理 3. 选择需要退款的订单 4. 点击"申请退款"按钮 5. 填写退款原因并提交</p>
+                            </div>
+                            <div class="p-3 bg-white rounded-lg border border-neutral-100">
+                                <h5 class="text-sm font-medium text-neutral-900 mb-1">退款需要多长时间？</h5>
+                                <p class="text-xs text-neutral-600">退款处理时间通常为1-3个工作日，具体到账时间取决于您的支付方式。</p>
+                            </div>
+                            <div class="p-3 bg-white rounded-lg border border-neutral-100">
+                                <h5 class="text-sm font-medium text-neutral-900 mb-1">商品价格是否包含税费？</h5>
+                                <p class="text-xs text-neutral-600">是的，商品价格已包含税费，您无需额外支付。</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // 添加公司介绍
+                html += `
+                    <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <h4 class="text-sm font-medium text-neutral-900 mb-3">公司介绍</h4>
+                        <div class="space-y-2 text-xs text-neutral-600">
+                            <p><strong>公司简介：</strong>我们是一家专注于提供优质产品和服务的企业，成立于2010年，总部位于北京。</p>
+                            <p><strong>服务理念：</strong>以客户为中心，提供高效、专业的服务，不断提升客户满意度。</p>
+                            <p><strong>联系方式：</strong>客服热线：400-123-4567，邮箱：service@example.com，工作时间：周一至周日 9:00-21:00</p>
+                        </div>
+                    </div>
+                `;
+                
+                // 添加服务条款
+                html += `
+                    <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <h4 class="text-sm font-medium text-neutral-900 mb-3">服务条款</h4>
+                        <div class="space-y-2 text-xs text-neutral-600">
+                            <p><strong>总则：</strong>本服务条款旨在规范用户与我司之间的权利义务关系。</p>
+                            <p><strong>用户权利：</strong>1. 有权获取我司提供的产品和服务 2. 有权对服务质量提出建议和投诉 3. 有权要求我司保护其个人信息</p>
+                            <p><strong>用户义务：</strong>1. 遵守国家法律法规 2. 遵守我司的各项规章制度 3. 不得利用我司服务从事违法活动</p>
+                            <p><strong>服务变更：</strong>我司有权根据业务需要调整服务内容，调整前会提前通知用户。</p>
+                        </div>
+                    </div>
+                `;
+                
+                html += `</div>`;
+                
+                knowledgeContent.innerHTML = html;
+            } catch (error) {
+                console.error('获取知识库失败:', error);
+                knowledgeContent.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fa fa-exclamation-circle text-2xl mb-2"></i><p class="text-sm">获取知识库信息失败</p></div>';
+            }
+        }
+
+        // 处理用户查询
+        async function handleQuerySubmit(e) {
+            e.preventDefault();
+            const query = userQuery.value.trim();
+            if (!query) return;
+
+            // 添加用户消息
+            addMessage('user', query);
+            userQuery.value = '';
+
+            // 显示加载状态
+            const loadingId = addMessage('system', '<div class="flex items-center"><i class="fa fa-spinner fa-spin mr-2"></i> 正在处理您的问题...</div>', true);
+
+            try {
+                // 发送请求
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query })
+                });
+
+                if (!response.ok) {
+                    throw new Error('服务器响应错误');
+                }
+
+                const data = await response.json();
+                currentQueryId = data.query_id;
+
+                // 移除加载状态
+                removeMessage(loadingId);
+
+                // 添加系统回复
+                addMessage('system', data.answer);
+
+                // 更新执行面板
+                updateExecutionPanel(data.execution_process);
+
+                // 更新反馈面板
+                updateFeedbackPanel(data.query_id);
+
+                // 滚动到底部
+                scrollToBottom();
+            } catch (error) {
+                console.error('查询失败:', error);
+                removeMessage(loadingId);
+                addMessage('system', '抱歉，处理您的问题时出现错误，请稍后再试。');
+                scrollToBottom();
+            }
+        }
+
+        // 处理文件上传
+        async function handleFileUpload(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('file-input');
+            const documentType = document.getElementById('document-type').value;
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('请选择要上传的文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('document_type', documentType);
+
+            try {
+                const response = await fetch('/api/documents/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('上传失败');
+                }
+
+                const data = await response.json();
+                
+                // 显示成功消息
+                const successMessage = document.createElement('div');
+                successMessage.className = 'fixed bottom-4 right-4 bg-secondary text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2 animate-fade-in';
+                successMessage.innerHTML = '<i class="fa fa-check"></i><span>文档上传成功</span>';
+                document.body.appendChild(successMessage);
+
+                // 3秒后移除成功消息
+                setTimeout(() => {
+                    successMessage.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                    setTimeout(() => successMessage.remove(), 300);
+                }, 3000);
+
+                // 关闭模态框
+                uploadModalContent.classList.remove('scale-100', 'opacity-100');
+                uploadModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    uploadModal.classList.add('hidden');
+                }, 300);
+
+                fileInput.value = '';
+            } catch (error) {
+                console.error('上传失败:', error);
+                
+                // 显示错误消息
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2 animate-fade-in';
+                errorMessage.innerHTML = '<i class="fa fa-exclamation-circle"></i><span>文档上传失败，请稍后再试</span>';
+                document.body.appendChild(errorMessage);
+
+                // 3秒后移除错误消息
+                setTimeout(() => {
+                    errorMessage.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                    setTimeout(() => errorMessage.remove(), 300);
+                }, 3000);
+            }
+        }
+
+        // 获取系统统计
+        async function fetchStats() {
+            try {
+                // 获取知识库统计信息
+                const docsResponse = await fetch('/api/documents/stats');
+                const docsStats = await docsResponse.json();
+                
+                // 获取反馈统计信息
+                const feedbackResponse = await fetch('/api/feedback/stats');
+                const feedbackStats = await feedbackResponse.json();
+                
+                statsContent.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                            <h4 class="text-xs font-medium text-neutral-500 mb-2">知识库状态</h4>
+                            <p class="text-2xl font-semibold text-neutral-900">${docsStats.total_documents || 0} 个文档</p>
+                            <p class="text-xs text-neutral-500 mt-1">包含 ${docsStats.total_documents || 0} 个文档</p>
+                        </div>
+                        <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                            <h4 class="text-xs font-medium text-neutral-500 mb-2">系统状态</h4>
+                            <p class="text-2xl font-semibold text-neutral-900">正常运行</p>
+                            <p class="text-xs text-neutral-500 mt-1">本地模型已加载</p>
+                        </div>
+                        <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                            <h4 class="text-xs font-medium text-neutral-500 mb-2">反馈统计</h4>
+                            <p class="text-2xl font-semibold text-neutral-900">${feedbackStats.total_feedbacks || 0} 条反馈</p>
+                            <p class="text-xs text-neutral-500 mt-1">解决率: ${feedbackStats.solved_rate || 0}%</p>
+                        </div>
+                    </div>
+                    <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <h4 class="text-xs font-medium text-neutral-500 mb-3">系统信息</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-xs text-neutral-600">模型:</span>
+                                <span class="text-xs font-medium text-neutral-900">Qwen3-8b (本地)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-xs text-neutral-600">嵌入模型:</span>
+                                <span class="text-xs font-medium text-neutral-900">Qwen3-Embedding</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-xs text-neutral-600">检索策略:</span>
+                                <span class="text-xs font-medium text-neutral-900">混合检索 (向量 60% + 关键词 40%)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-xs text-neutral-600">Agent 框架:</span>
+                                <span class="text-xs font-medium text-neutral-900">Plan-and-Execute + ReAct</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('获取统计失败:', error);
+                statsContent.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fa fa-exclamation-circle text-2xl mb-2"></i><p class="text-sm">获取统计信息失败</p></div>';
+            }
+        }
+
+        // 解析系统回答格式
+        function parseSystemAnswer(content) {
+            // 移除多余的格式化标记
+            let parsedContent = content;
+            
+            // 移除 ### 和 *** 标记
+            parsedContent = parsedContent.replace(/\*{3,}|#{3,}/g, '');
+            
+            // 移除 --- 和 ### 分隔符
+            parsedContent = parsedContent.replace(/---+/g, '');
+            
+            // 移除 ## 标记，但保留内容
+            parsedContent = parsedContent.replace(/##\s+/g, '');
+            
+            // 移除 # 标记
+            parsedContent = parsedContent.replace(/#/g, '');
+            
+            // 处理重要步骤标记
+            parsedContent = parsedContent.replace(/\*\*重要步骤\*\*/g, '<strong>重要步骤：</strong>');
+            
+            // 处理信息来源标记
+            parsedContent = parsedContent.replace(/\*\*信息来源\*\*：/g, '<br><small class="text-neutral-500">信息来源：</small>');
+            
+            // 处理关键内容标记
+            parsedContent = parsedContent.replace(/\*\*关键内容\*\*/g, '<strong>关键内容：</strong>');
+            
+            // 处理注意事项标记
+            parsedContent = parsedContent.replace(/\*\*注意事项\*\*/g, '<strong>注意事项：</strong>');
+            
+            // 处理温馨提示标记
+            parsedContent = parsedContent.replace(/\*\*温馨提示\*\*/g, '<div class="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100"><strong>温馨提示：</strong>');
+            parsedContent = parsedContent.replace(/\*\*温馨提示\*\*：/g, '<div class="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100"><strong>温馨提示：</strong>');
+            
+            // 关闭温馨提示的div
+            parsedContent = parsedContent.replace(/(温馨提示：[^<]+)/g, '$1</div>');
+            
+            // 处理列表项
+            parsedContent = parsedContent.replace(/\s*\d+\.\s*/g, (match) => {
+                return '<br>' + match;
+            });
+            
+            // 处理换行
+            parsedContent = parsedContent.replace(/\n/g, '<br>');
+            
+            return parsedContent;
+        }
+
+        // 添加消息
+        function addMessage(type, content, isTemporary = false) {
+            const messageId = isTemporary ? 'temp-' + Date.now() : 'msg-' + Date.now();
+            const messageDiv = document.createElement('div');
+            messageDiv.id = messageId;
+            messageDiv.className = `flex mb-6 ${type === 'user' ? 'justify-end' : ''}`;
+
+            if (type === 'user') {
+                messageDiv.innerHTML = `
+                    <div class="bg-primary text-white rounded-lg p-4 max-w-[80%] border border-primary/20">
+                        <p class="text-sm">${content}</p>
+                        <p class="text-xs text-white/70 mt-2">您 · 刚刚</p>
+                    </div>
+                    <div class="flex-shrink-0 ml-3">
+                        <div class="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600">
+                            <i class="fa fa-user text-sm"></i>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // 解析系统回答
+                const parsedContent = parseSystemAnswer(content);
+                
+                messageDiv.innerHTML = `
+                    <div class="flex-shrink-0 mr-3">
+                        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
+                            <i class="fa fa-robot text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="bg-neutral-100 rounded-lg p-4 max-w-[80%] border border-neutral-200">
+                        <div class="prose prose-sm max-w-none">${parsedContent}</div>
+                        <p class="text-xs text-neutral-500 mt-2">系统 · 刚刚</p>
+                    </div>
+                `;
+            }
+
+            // 添加动画效果
+            messageDiv.classList.add('opacity-0', 'translate-y-2', 'transition-all', 'duration-300');
+            chatContainer.appendChild(messageDiv);
+            
+            // 触发重排后添加动画
+            void messageDiv.offsetWidth;
+            messageDiv.classList.remove('opacity-0', 'translate-y-2');
+
+            scrollToBottom();
+            return messageId;
+        }
+
+        // 移除消息
+        function removeMessage(id) {
+            const message = document.getElementById(id);
+            if (message) {
+                message.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => message.remove(), 300);
+            }
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 更新执行面板
+        function updateExecutionPanel(executionProcess) {
+            if (!executionProcess || executionProcess.length === 0) {
+                executionPanel.innerHTML = `
+                    <div class="flex items-center justify-center py-12 text-neutral-400">
+                        <div class="text-center">
+                            <i class="fa fa-info-circle text-2xl mb-2"></i>
+                            <p class="text-sm">处理过程将显示在这里</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="space-y-3">';
+            executionProcess.forEach((step, index) => {
+                html += `
+                    <div class="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <div class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">${index + 1}</div>
+                            <div class="font-medium text-sm text-neutral-900">${step.step}</div>
+                        </div>
+                        <div class="text-sm text-neutral-600 ml-7">${step.content}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            executionPanel.innerHTML = html;
+        }
+
+        // 更新反馈面板
+        function updateFeedbackPanel(queryId) {
+            feedbackPanel.innerHTML = `
+                <form id="feedback-form" class="space-y-4">
+                    <input type="hidden" name="query_id" value="${queryId}">
+                    <p class="text-sm font-medium text-neutral-700">您的问题是否得到解决？</p>
+                    <div class="flex space-x-4">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="is_solved" value="true" class="h-4 w-4 text-primary focus:ring-primary border-neutral-300">
+                            <span class="text-sm text-neutral-700">是</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="is_solved" value="false" class="h-4 w-4 text-primary focus:ring-primary border-neutral-300">
+                            <span class="text-sm text-neutral-700">否</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-700 mb-1">补充信息（可选）</label>
+                        <textarea name="additional_info" rows="3" class="w-full px-3 py-2 border border-neutral-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all-300" placeholder="请描述您的具体需求或问题..."></textarea>
+                    </div>
+                    <button type="submit" class="w-full inline-flex justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all-300">
+                        提交反馈
+                    </button>
+                </form>
+            `;
+
+            // 添加反馈表单提交事件
+            const feedbackForm = document.getElementById('feedback-form');
+            if (feedbackForm) {
+                feedbackForm.addEventListener('submit', handleFeedbackSubmit);
+            }
+        }
+
+        // 处理反馈提交
+        async function handleFeedbackSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const feedbackData = {
+                query_id: formData.get('query_id'),
+                is_solved: formData.get('is_solved') === 'true',
+                additional_info: formData.get('additional_info')
+            };
+
+            try {
+                const response = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(feedbackData)
+                });
+
+                if (!response.ok) {
+                    throw new Error('反馈提交失败');
+                }
+
+                const data = await response.json();
+                
+                // 显示成功消息
+                feedbackPanel.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-8 text-secondary">
+                        <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-4">
+                            <i class="fa fa-check text-xl"></i>
+                        </div>
+                        <h4 class="text-sm font-medium mb-1">感谢您的反馈！</h4>
+                        <p class="text-xs text-neutral-500 text-center">您的反馈将帮助我们不断改进服务</p>
+                    </div>
+                `;
+
+                // 显示顶部通知
+                const successMessage = document.createElement('div');
+                successMessage.className = 'fixed top-4 right-4 bg-secondary text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2 animate-fade-in';
+                successMessage.innerHTML = '<i class="fa fa-check"></i><span>反馈提交成功</span>';
+                document.body.appendChild(successMessage);
+
+                // 3秒后移除成功消息
+                setTimeout(() => {
+                    successMessage.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                    setTimeout(() => successMessage.remove(), 300);
+                }, 3000);
+            } catch (error) {
+                console.error('反馈提交失败:', error);
+                
+                // 显示错误消息
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2 animate-fade-in';
+                errorMessage.innerHTML = '<i class="fa fa-exclamation-circle"></i><span>反馈提交失败，请稍后再试</span>';
+                document.body.appendChild(errorMessage);
+
+                // 3秒后移除错误消息
+                setTimeout(() => {
+                    errorMessage.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                    setTimeout(() => errorMessage.remove(), 300);
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

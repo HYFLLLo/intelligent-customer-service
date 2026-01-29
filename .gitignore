@@ -1,0 +1,25 @@
+﻿# 依赖包
+venv/
+env/
+*.pyc
+__pycache__/
+
+# 环境文件
+.env
+.env.local
+.env.*.local
+
+# 数据文件
+data/
+*.xlsx
+*.xls
+
+# 日志文件
+logs/
+*.log
+
+# IDE配置
+.vscode/
+.idea/
+*.swp
+*.swo
