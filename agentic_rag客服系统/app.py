@@ -3,10 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 import uvicorn
 import os
 import json
+import uuid
 from dotenv import load_dotenv
+import asyncio
+from typing import AsyncGenerator
 
 # 加载配置
 load_dotenv()
@@ -71,18 +75,56 @@ async def upload_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 处理用户查询
+# 处理用户查询（流式响应）
 @app.post("/api/query")
 async def process_query(query: dict):
     try:
         user_query = query.get("query", "")
+        session_id = query.get("session_id", "default")
         if not user_query:
             raise HTTPException(status_code=400, detail="查询内容不能为空")
         
-        # 使用Agent处理查询
-        result = agent.process_query(user_query)
+        # 使用Agent处理查询（流式）
+        result = agent.process_query(user_query, session_id)
         
         return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 处理用户查询（流式响应）
+@app.post("/api/query/stream")
+async def process_query_stream(query: dict):
+    try:
+        user_query = query.get("query", "")
+        session_id = query.get("session_id", "default")
+        if not user_query:
+            raise HTTPException(status_code=400, detail="查询内容不能为空")
+        
+        # 使用Agent处理查询（流式）
+        async def generate():
+            try:
+                # 生成查询ID
+                query_id = str(uuid.uuid4())
+                
+                # 发送查询ID
+                yield f"data: {json.dumps({'type': 'query_id', 'data': query_id}, ensure_ascii=False)}\n\n"
+                
+                # 流式处理查询
+                async for chunk in agent.process_query_stream(user_query, query_id, session_id):
+                    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                    
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'data': str(e)}, ensure_ascii=False)}\n\n"
+        
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

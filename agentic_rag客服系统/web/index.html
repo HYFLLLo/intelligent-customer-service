@@ -65,6 +65,19 @@
             .text-balance {
                 text-wrap: balance;
             }
+            .animate-fade-in {
+                animation: fadeIn 0.3s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
         }
     </style>
 </head>
@@ -483,20 +496,30 @@
 
             closeStatsModal.addEventListener('click', closeStatsModalFunc);
 
+            // 生成会话ID
+            function getSessionId() {
+                let sessionId = localStorage.getItem('sessionId');
+                if (!sessionId) {
+                    sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('sessionId', sessionId);
+                }
+                return sessionId;
+            }
+
             // 执行面板切换
-            let executionPanelVisible = true;
-            toggleExecution.addEventListener('click', function() {
-                const icon = this.querySelector('i');
-                if (executionPanelVisible) {
-                    icon.classList.remove('fa-chevron-down');
-                    icon.classList.add('fa-chevron-up');
-                    executionPanel.style.maxHeight = '0';
-                    executionPanel.style.overflow = 'hidden';
-                    executionPanel.style.paddingTop = '0';
-                    executionPanel.style.paddingBottom = '0';
-                } else {
-                    icon.classList.remove('fa-chevron-up');
-                    icon.classList.add('fa-chevron-down');
+        let executionPanelVisible = true;
+        toggleExecution.addEventListener('click', function() {
+            const icon = this.querySelector('i');
+            if (executionPanelVisible) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+                executionPanel.style.maxHeight = '0';
+                executionPanel.style.overflow = 'hidden';
+                executionPanel.style.paddingTop = '0';
+                executionPanel.style.paddingBottom = '0';
+            } else {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
                     executionPanel.style.maxHeight = '300px';
                     executionPanel.style.overflow = 'auto';
                     executionPanel.style.paddingTop = '1rem';
@@ -633,7 +656,7 @@
             }
         }
 
-        // 处理用户查询
+        // 处理用户查询（流式响应）
         async function handleQuerySubmit(e) {
             e.preventDefault();
             const query = userQuery.value.trim();
@@ -643,45 +666,134 @@
             addMessage('user', query);
             userQuery.value = '';
 
-            // 显示加载状态
-            const loadingId = addMessage('system', '<div class="flex items-center"><i class="fa fa-spinner fa-spin mr-2"></i> 正在处理您的问题...</div>', true);
+            // 创建系统消息容器（用于流式显示）
+            const systemMessageId = addMessage('system', '', false, true);
+            const systemMessageContent = document.querySelector(`#${systemMessageId} .prose`);
+            
+            // 清空执行面板
+            executionPanel.innerHTML = '';
+            
+            // 状态提示将在系统消息中显示
+            
+            // 用于存储执行过程
+            const executionSteps = [];
+            let fullAnswer = '';
+            let planSteps = [];
 
             try {
-                // 发送请求
-                const response = await fetch('/api/query', {
+                // 获取会话ID
+                const sessionId = localStorage.getItem('sessionId') || 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('sessionId', sessionId);
+                
+                // 使用EventSource接收流式数据
+                const response = await fetch('/api/query/stream', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query })
+                    body: JSON.stringify({ query, session_id: sessionId })
                 });
 
                 if (!response.ok) {
                     throw new Error('服务器响应错误');
                 }
 
-                const data = await response.json();
-                currentQueryId = data.query_id;
+                // 读取流式数据
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
 
-                // 移除加载状态
-                removeMessage(loadingId);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                // 添加系统回复
-                addMessage('system', data.answer);
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // 保留最后一个不完整的行
 
-                // 更新执行面板
-                updateExecutionPanel(data.execution_process);
-
-                // 更新反馈面板
-                updateFeedbackPanel(data.query_id);
-
-                // 滚动到底部
-                scrollToBottom();
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.substring(6));
+                            
+                            switch (data.type) {
+                                case 'query_id':
+                                    currentQueryId = data.data;
+                                    break;
+                                    
+                                case 'step':
+                                    // 处理规划步骤的流式显示
+                                    if (data.step === '规划') {
+                                        // 对于规划步骤，流式显示其内容
+                                        planSteps.push({
+                                            step: data.step,
+                                            content: data.content
+                                        });
+                                        // 实时更新规划过程
+                                        updateExecutionPanelRealtime(planSteps);
+                                    } else {
+                                        // 其他步骤正常处理
+                                        executionSteps.push({
+                                            step: data.step,
+                                            content: data.content
+                                        });
+                                        updateExecutionPanelRealtime(executionSteps);
+                                    }
+                                    break;
+                                    
+                                case 'answer_chunk':
+                                    // 流式显示回答
+                                    fullAnswer += data.content;
+                                    if (systemMessageContent) {
+                                        systemMessageContent.innerHTML = parseSystemAnswer(fullAnswer);
+                                    }
+                                    scrollToBottom();
+                                    break;
+                                    
+                                case 'complete':
+                                    // 处理完成
+                                    fullAnswer = data.data.answer;
+                                    if (systemMessageContent) {
+                                        systemMessageContent.innerHTML = parseSystemAnswer(fullAnswer);
+                                    }
+                                    
+                                    // 隐藏状态提示
+                                    const statusElement = document.getElementById(`${systemMessageId}-status`);
+                                    if (statusElement) {
+                                        statusElement.classList.add('hidden');
+                                    }
+                                    
+                                    updateExecutionPanelRealtime(data.data.execution_process, true);
+                                    updateFeedbackPanel(data.data.query_id);
+                                    scrollToBottom();
+                                    break;
+                                    
+                                case 'error':
+                                    console.error('处理错误:', data.data);
+                                    if (systemMessageContent) {
+                                        systemMessageContent.innerHTML = `<div class="text-red-500">抱歉，处理您的问题时出现错误：${data.data}</div>`;
+                                    }
+                                    
+                                    // 隐藏状态提示
+                                    const errorStatusElement = document.getElementById(`${systemMessageId}-status`);
+                                    if (errorStatusElement) {
+                                        errorStatusElement.classList.add('hidden');
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                }
             } catch (error) {
                 console.error('查询失败:', error);
-                removeMessage(loadingId);
-                addMessage('system', '抱歉，处理您的问题时出现错误，请稍后再试。');
-                scrollToBottom();
+                if (systemMessageContent) {
+                    systemMessageContent.innerHTML = '<div class="text-red-500">抱歉，处理您的问题时出现错误，请稍后再试。</div>';
+                }
+                
+                // 隐藏状态提示
+                const errorStatusElement = document.getElementById(`${systemMessageId}-status`);
+                if (errorStatusElement) {
+                    errorStatusElement.classList.add('hidden');
+                }
             }
         }
 
@@ -855,7 +967,7 @@
         }
 
         // 添加消息
-        function addMessage(type, content, isTemporary = false) {
+        function addMessage(type, content, isTemporary = false, isStreaming = false) {
             const messageId = isTemporary ? 'temp-' + Date.now() : 'msg-' + Date.now();
             const messageDiv = document.createElement('div');
             messageDiv.id = messageId;
@@ -875,7 +987,7 @@
                 `;
             } else {
                 // 解析系统回答
-                const parsedContent = parseSystemAnswer(content);
+                const parsedContent = isStreaming ? '' : parseSystemAnswer(content);
                 
                 messageDiv.innerHTML = `
                     <div class="flex-shrink-0 mr-3">
@@ -883,9 +995,14 @@
                             <i class="fa fa-robot text-sm"></i>
                         </div>
                     </div>
-                    <div class="bg-neutral-100 rounded-lg p-4 max-w-[80%] border border-neutral-200">
+                    <div class="bg-neutral-100 rounded-lg p-4 max-w-[80%] border border-neutral-200 relative">
                         <div class="prose prose-sm max-w-none">${parsedContent}</div>
-                        <p class="text-xs text-neutral-500 mt-2">系统 · 刚刚</p>
+                        <div class="flex justify-between items-center mt-2">
+                            <div id="${messageId}-status" class="text-xs text-neutral-500 ${isStreaming ? '' : 'hidden'}">
+                                <i class="fa fa-spinner fa-spin mr-1"></i>正在回答您的问题...
+                            </div>
+                            <p class="text-xs text-neutral-500">系统 · 刚刚</p>
+                        </div>
                     </div>
                 `;
             }
@@ -936,6 +1053,34 @@
                     <div class="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
                         <div class="flex items-center space-x-2 mb-1">
                             <div class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">${index + 1}</div>
+                            <div class="font-medium text-sm text-neutral-900">${step.step}</div>
+                        </div>
+                        <div class="text-sm text-neutral-600 ml-7">${step.content}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            executionPanel.innerHTML = html;
+        }
+
+        // 实时更新执行面板
+        function updateExecutionPanelRealtime(executionSteps, isComplete = false) {
+            if (!executionSteps || executionSteps.length === 0) {
+                return;
+            }
+
+            let html = '<div class="space-y-3">';
+            executionSteps.forEach((step, index) => {
+                const isLast = index === executionSteps.length - 1;
+                const animationClass = isLast && !isComplete ? 'animate-pulse' : '';
+                const isActive = isLast && !isComplete;
+                
+                html += `
+                    <div class="p-3 bg-neutral-50 rounded-lg border border-neutral-200 ${animationClass}">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <div class="w-5 h-5 rounded-full ${isActive ? 'bg-primary animate-pulse' : 'bg-primary/10'} flex items-center justify-center ${isActive ? 'text-white' : 'text-primary'} text-xs font-medium">
+                                ${isActive ? '<i class="fa fa-spinner fa-spin"></i>' : index + 1}
+                            </div>
                             <div class="font-medium text-sm text-neutral-900">${step.step}</div>
                         </div>
                         <div class="text-sm text-neutral-600 ml-7">${step.content}</div>
