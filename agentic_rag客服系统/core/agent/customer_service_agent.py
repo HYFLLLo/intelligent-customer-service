@@ -1,12 +1,15 @@
 import os
 import uuid
 import asyncio
-from typing import List, Dict, Optional, AsyncGenerator
+from typing import List, Dict, Optional, AsyncGenerator, Tuple
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from loguru import logger
 from rich.console import Console
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 from core.memory.conversation_memory import ConversationMemory
 
@@ -24,6 +27,16 @@ class CustomerServiceAgent:
         )
         self.output_parser = StrOutputParser()
         self.conversation_memory = ConversationMemory()
+        
+        # 初始化文本相似度检测器
+        self.tfidf_vectorizer = TfidfVectorizer(
+            token_pattern=r'\b\w+\b',
+            stop_words=None,
+            lowercase=True
+        )
+        
+        # 初始化会话历史缓存（存储最近的查询和检索结果）
+        self.session_cache = {}
         
         # 初始化提示模板
         self.plan_prompt = ChatPromptTemplate.from_template("""
@@ -106,13 +119,32 @@ Agent执行过程：
             if personal_info:
                 full_context = personal_info + "\n" + conversation_history
             
-            # 1. 制定执行计划
-            plan = self._create_plan(query, full_context)
-            logger.info(f"生成执行计划: {plan}")
+            # 检查是否有相似的历史查询
+            similar_query_data = self._find_similar_query(query, session_id)
             
-            # 2. 执行ReAct推理循环
-            execution_process, retrieved_info = self._execute_react(query, plan, full_context)
-            logger.info(f"执行完成，检索到 {len(retrieved_info)} 条信息")
+            if similar_query_data:
+                # 复用历史检索结果
+                logger.info("复用历史检索结果，跳过重新检索")
+                plan = similar_query_data["plan"]
+                retrieved_info = similar_query_data["retrieved_info"]
+                
+                # 构建执行过程
+                execution_process = [
+                    {"step": "思考", "content": "检测到相似查询，复用历史检索结果"},
+                    {"step": "行动", "content": "直接使用之前的检索信息"},
+                    {"step": "反思", "content": f"复用 {len(retrieved_info)} 条历史检索信息，生成回答"}
+                ]
+            else:
+                # 1. 制定执行计划
+                plan = self._create_plan(query, full_context)
+                logger.info(f"生成执行计划: {plan}")
+                
+                # 2. 执行ReAct推理循环
+                execution_process, retrieved_info = self._execute_react(query, plan, full_context)
+                logger.info(f"执行完成，检索到 {len(retrieved_info)} 条信息")
+                
+                # 缓存检索结果
+                self._cache_query_result(query, session_id, retrieved_info, plan)
             
             # 3. 生成最终回答
             final_answer = self._generate_final_answer(query, execution_process, retrieved_info, full_context)
@@ -157,69 +189,98 @@ Agent执行过程：
             if personal_info:
                 full_context = personal_info + "\n" + conversation_history
             
-            # 步骤1：制定执行计划
-            yield {"type": "step", "step": "规划", "content": "正在分析您的问题并制定执行计划..."}
-            await asyncio.sleep(0.5)
+            # 检查是否有相似的历史查询
+            similar_query_data = self._find_similar_query(query, session_id)
             
-            # 流式生成执行计划
-            yield {"type": "step", "step": "规划", "content": "1. 分析用户问题的核心需求..."}
-            await asyncio.sleep(0.3)
-            
-            yield {"type": "step", "step": "规划", "content": "2. 确定需要检索的关键信息..."}
-            await asyncio.sleep(0.3)
-            
-            yield {"type": "step", "step": "规划", "content": "3. 制定工具调用策略和顺序..."}
-            await asyncio.sleep(0.3)
-            
-            # 实际生成计划
-            plan = self._create_plan(query, full_context)
-            logger.info(f"生成执行计划: {plan}")
-            
-            # 流式显示计划内容
-            plan_lines = plan.split('\n')
-            for i, line in enumerate(plan_lines):
-                if line.strip():
-                    yield {"type": "step", "step": "规划", "content": f"执行计划: {line.strip()}"}
-                    await asyncio.sleep(0.2)
-            
-            yield {"type": "step", "step": "规划", "content": "执行计划已生成，开始执行..."}
-            await asyncio.sleep(0.3)
-            
-            # 步骤2：思考
-            yield {"type": "step", "step": "思考", "content": "分析用户问题，确定需要检索的关键信息"}
-            await asyncio.sleep(0.5)
-            
-            # 步骤3：行动 - 检索信息
-            yield {"type": "step", "step": "行动", "content": "调用混合检索工具获取相关信息"}
-            await asyncio.sleep(0.3)
-            
-            # 执行检索
-            retrieved_docs = self.hybrid_retriever.get_relevant_documents(query)
-            
-            # 格式化检索结果
-            retrieved_info = []
-            for i, doc in enumerate(retrieved_docs):
-                doc_info = {
-                    "id": i + 1,
-                    "content": doc["content"],
-                    "metadata": doc["metadata"],
-                    "score": doc.get("score", 0)
-                }
-                retrieved_info.append(doc_info)
-            
-            # 步骤4：反思
-            yield {"type": "step", "step": "反思", "content": f"检索完成，找到 {len(retrieved_info)} 条相关信息，现在基于这些信息生成回答"}
-            await asyncio.sleep(0.5)
+            if similar_query_data:
+                # 复用历史检索结果
+                logger.info("复用历史检索结果，跳过重新检索")
+                plan = similar_query_data["plan"]
+                retrieved_info = similar_query_data["retrieved_info"]
+                
+                # 流式显示复用信息
+                yield {"type": "step", "step": "思考", "content": "检测到相似查询，复用历史检索结果"}
+                await asyncio.sleep(0.3)
+                
+                yield {"type": "step", "step": "行动", "content": "直接使用之前的检索信息"}
+                await asyncio.sleep(0.3)
+                
+                yield {"type": "step", "step": "反思", "content": f"复用 {len(retrieved_info)} 条历史检索信息，生成回答"}
+                await asyncio.sleep(0.5)
+                
+                # 构建执行过程字符串
+                execution_process = [
+                    {"step": "思考", "content": "检测到相似查询，复用历史检索结果"},
+                    {"step": "行动", "content": "直接使用之前的检索信息"},
+                    {"step": "反思", "content": f"复用 {len(retrieved_info)} 条历史检索信息，生成回答"}
+                ]
+            else:
+                # 步骤1：制定执行计划
+                yield {"type": "step", "step": "规划", "content": "正在分析您的问题并制定执行计划..."}
+                await asyncio.sleep(0.5)
+                
+                # 流式生成执行计划
+                yield {"type": "step", "step": "规划", "content": "1. 分析用户问题的核心需求..."}
+                await asyncio.sleep(0.3)
+                
+                yield {"type": "step", "step": "规划", "content": "2. 确定需要检索的关键信息..."}
+                await asyncio.sleep(0.3)
+                
+                yield {"type": "step", "step": "规划", "content": "3. 制定工具调用策略和顺序..."}
+                await asyncio.sleep(0.3)
+                
+                # 实际生成计划
+                plan = self._create_plan(query, full_context)
+                logger.info(f"生成执行计划: {plan}")
+                
+                # 流式显示计划内容
+                plan_lines = plan.split('\n')
+                for i, line in enumerate(plan_lines):
+                    if line.strip():
+                        yield {"type": "step", "step": "规划", "content": f"执行计划: {line.strip()}"}
+                        await asyncio.sleep(0.2)
+                
+                yield {"type": "step", "step": "规划", "content": "执行计划已生成，开始执行..."}
+                await asyncio.sleep(0.3)
+                
+                # 步骤2：思考
+                yield {"type": "step", "step": "思考", "content": "分析用户问题，确定需要检索的关键信息"}
+                await asyncio.sleep(0.5)
+                
+                # 步骤3：行动 - 检索信息
+                yield {"type": "step", "step": "行动", "content": "调用混合检索工具获取相关信息"}
+                await asyncio.sleep(0.3)
+                
+                # 执行检索
+                retrieved_docs = self.hybrid_retriever.get_relevant_documents(query)
+                
+                # 格式化检索结果
+                retrieved_info = []
+                for i, doc in enumerate(retrieved_docs):
+                    doc_info = {
+                        "id": i + 1,
+                        "content": doc["content"],
+                        "metadata": doc["metadata"],
+                        "score": doc.get("score", 0)
+                    }
+                    retrieved_info.append(doc_info)
+                
+                # 缓存检索结果
+                self._cache_query_result(query, session_id, retrieved_info, plan)
+                
+                # 步骤4：反思
+                yield {"type": "step", "step": "反思", "content": f"检索完成，找到 {len(retrieved_info)} 条相关信息，现在基于这些信息生成回答"}
+                await asyncio.sleep(0.5)
+                
+                # 构建执行过程字符串
+                execution_process = [
+                    {"step": "思考", "content": "分析用户问题，确定需要检索的关键信息"},
+                    {"step": "行动", "content": "调用混合检索工具获取相关信息"},
+                    {"step": "反思", "content": f"检索完成，找到 {len(retrieved_info)} 条相关信息，现在基于这些信息生成回答"}
+                ]
             
             # 步骤5：生成最终回答（流式）
             yield {"type": "step", "step": "生成回答", "content": "正在生成最终回答..."}
-            
-            # 构建执行过程字符串
-            execution_process = [
-                {"step": "思考", "content": "分析用户问题，确定需要检索的关键信息"},
-                {"step": "行动", "content": "调用混合检索工具获取相关信息"},
-                {"step": "反思", "content": f"检索完成，找到 {len(retrieved_info)} 条相关信息，现在基于这些信息生成回答"}
-            ]
             
             process_str = "\n".join([f"{step['step']}: {step['content']}" for step in execution_process])
             
@@ -382,3 +443,65 @@ Agent执行过程：
             "retrieved_info": [],
             "timestamp": os.path.getmtime(__file__)
         }
+    
+    def _calculate_similarity(self, text1: str, text2: str) -> float:
+        """计算两个文本的相似度"""
+        try:
+            # 使用TF-IDF计算相似度
+            vectors = self.tfidf_vectorizer.fit_transform([text1, text2])
+            similarity = cosine_similarity(vectors[0:1], vectors[1:2])[0][0]
+            return float(similarity)
+        except Exception as e:
+            logger.error(f"计算文本相似度失败: {str(e)}")
+            return 0.0
+    
+    def _find_similar_query(self, query: str, session_id: str, threshold: float = 0.7) -> Optional[Dict]:
+        """查找会话历史中相似的查询"""
+        if session_id not in self.session_cache:
+            return None
+        
+        max_similarity = 0.0
+        best_match = None
+        
+        for cached_query, cached_data in self.session_cache[session_id].items():
+            similarity = self._calculate_similarity(query, cached_query)
+            logger.debug(f"查询相似度: '{query[:30]}...' 与 '{cached_query[:30]}...' = {similarity:.2f}")
+            
+            if similarity > max_similarity and similarity >= threshold:
+                max_similarity = similarity
+                best_match = cached_data
+        
+        if best_match:
+            logger.info(f"找到相似查询，相似度: {max_similarity:.2f}")
+        
+        return best_match
+    
+    def _cache_query_result(self, query: str, session_id: str, retrieved_info: List[Dict], plan: str):
+        """缓存查询结果"""
+        if session_id not in self.session_cache:
+            self.session_cache[session_id] = {}
+        
+        # 限制每个会话的缓存大小（最多5个查询）
+        if len(self.session_cache[session_id]) >= 5:
+            # 删除最旧的缓存
+            oldest_query = next(iter(self.session_cache[session_id]))
+            del self.session_cache[session_id][oldest_query]
+        
+        # 缓存新结果
+        self.session_cache[session_id][query] = {
+            "retrieved_info": retrieved_info,
+            "plan": plan,
+            "timestamp": os.path.getmtime(__file__)
+        }
+        logger.debug(f"缓存查询结果: '{query[:30]}...'")
+    
+    def clear_session_cache(self, session_id: str):
+        """清除会话缓存"""
+        if session_id in self.session_cache:
+            del self.session_cache[session_id]
+            logger.info(f"清除会话缓存: {session_id}")
+    
+    def clear_all_cache(self):
+        """清除所有缓存"""
+        self.session_cache = {}
+        logger.info("清除所有会话缓存")

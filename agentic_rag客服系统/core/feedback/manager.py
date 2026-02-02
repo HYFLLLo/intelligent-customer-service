@@ -222,3 +222,80 @@ class FeedbackManager:
         except Exception as e:
             logger.error(f"清空反馈数据失败: {str(e)}")
             return False
+    
+    def get_all_feedbacks(self) -> List[Dict]:
+        """获取所有反馈详情"""
+        try:
+            with open(self.feedback_file, "r", encoding="utf-8") as f:
+                feedbacks = json.load(f)
+            
+            # 按时间倒序排列
+            feedbacks.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            
+            return feedbacks
+        except Exception as e:
+            logger.error(f"获取所有反馈失败: {str(e)}")
+            return []
+    
+    def get_feedbacks_by_status(self, is_solved: bool) -> List[Dict]:
+        """按解决状态获取反馈"""
+        try:
+            with open(self.feedback_file, "r", encoding="utf-8") as f:
+                feedbacks = json.load(f)
+            
+            # 过滤指定状态的反馈
+            filtered_feedbacks = [f for f in feedbacks if f.get("is_solved", False) == is_solved]
+            
+            # 按时间倒序排列
+            filtered_feedbacks.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            
+            return filtered_feedbacks
+        except Exception as e:
+            logger.error(f"按状态获取反馈失败: {str(e)}")
+            return []
+    
+    def get_feedback_details(self, limit: int = 50) -> Dict:
+        """获取详细的反馈统计信息"""
+        try:
+            with open(self.feedback_file, "r", encoding="utf-8") as f:
+                feedbacks = json.load(f)
+            
+            if not feedbacks:
+                return {
+                    "total_feedbacks": 0,
+                    "solved_count": 0,
+                    "solved_rate": 0,
+                    "unsolved_count": 0,
+                    "solved_feedbacks": [],
+                    "unsolved_feedbacks": []
+                }
+            
+            # 计算统计信息
+            total_feedbacks = len(feedbacks)
+            solved_count = sum(1 for f in feedbacks if f.get("is_solved", False))
+            unsolved_count = total_feedbacks - solved_count
+            solved_rate = (solved_count / total_feedbacks * 100) if total_feedbacks > 0 else 0
+            
+            # 按状态分组反馈
+            solved_feedbacks = [f for f in feedbacks if f.get("is_solved", False)]
+            unsolved_feedbacks = [f for f in feedbacks if not f.get("is_solved", False)]
+            
+            # 按时间倒序排列
+            solved_feedbacks.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            unsolved_feedbacks.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            
+            # 限制返回数量
+            solved_feedbacks = solved_feedbacks[:limit]
+            unsolved_feedbacks = unsolved_feedbacks[:limit]
+            
+            return {
+                "total_feedbacks": total_feedbacks,
+                "solved_count": solved_count,
+                "solved_rate": round(solved_rate, 2),
+                "unsolved_count": unsolved_count,
+                "solved_feedbacks": solved_feedbacks,
+                "unsolved_feedbacks": unsolved_feedbacks
+            }
+        except Exception as e:
+            logger.error(f"获取详细反馈统计失败: {str(e)}")
+            return {"error": str(e)}

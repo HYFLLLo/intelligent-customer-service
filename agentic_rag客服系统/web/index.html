@@ -396,6 +396,26 @@
         </div>
     </div>
 
+    <!-- 反馈详情模态框 -->
+    <div id="feedback-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] transform transition-all duration-300 scale-95 opacity-0" id="feedback-modal-content">
+            <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center">
+                <h3 class="text-base font-medium text-neutral-900">反馈详情</h3>
+                <button id="close-feedback-modal" class="text-neutral-400 hover:text-neutral-500 transition-all-300">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div id="feedback-content" class="px-6 py-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <div class="flex items-center justify-center py-12 text-neutral-400">
+                    <div class="text-center">
+                        <i class="fa fa-comment-o text-4xl mb-4"></i>
+                        <p class="text-sm">加载反馈内容中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 全局变量
         let currentQueryId = null;
@@ -422,6 +442,11 @@
         const executionPanel = document.getElementById('execution-panel');
         const feedbackPanel = document.getElementById('feedback-panel');
         const quickQuestions = document.querySelectorAll('.quick-question');
+        const feedbackStatsCard = document.getElementById('feedback-stats-card');
+        const feedbackModal = document.getElementById('feedback-modal');
+        const feedbackModalContent = document.getElementById('feedback-modal-content');
+        const closeFeedbackModal = document.getElementById('close-feedback-modal');
+        const feedbackContent = document.getElementById('feedback-content');
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -546,7 +571,168 @@
                     closeStatsModalFunc();
                 }
             });
+
+            // 反馈详情模态框控制
+            function openFeedbackModal() {
+                feedbackModal.classList.remove('hidden');
+                setTimeout(() => {
+                    feedbackModalContent.classList.remove('scale-95', 'opacity-0');
+                    feedbackModalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+                fetchFeedbackDetails();
+            }
+
+            function closeFeedbackModalFunc() {
+                feedbackModalContent.classList.remove('scale-100', 'opacity-100');
+                feedbackModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    feedbackModal.classList.add('hidden');
+                }, 300);
+            }
+
+            // 反馈统计卡片点击事件
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('#feedback-stats-card')) {
+                    openFeedbackModal();
+                }
+            });
+
+            closeFeedbackModal.addEventListener('click', closeFeedbackModalFunc);
+
+            feedbackModal.addEventListener('click', function(e) {
+                if (e.target === feedbackModal) {
+                    closeFeedbackModalFunc();
+                }
+            });
         });
+
+        // 获取反馈详情
+        async function fetchFeedbackDetails() {
+            try {
+                // 获取详细反馈统计
+                const response = await fetch('/api/feedback/details?limit=100');
+                const feedbackData = await response.json();
+                
+                // 构建反馈内容HTML
+                let html = `
+                    <div class="space-y-6">
+                        <!-- 反馈概览 -->
+                        <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                            <h4 class="text-sm font-medium text-neutral-900 mb-3">反馈概览</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div class="bg-white p-3 rounded-lg border border-neutral-100 text-center">
+                                    <p class="text-2xl font-semibold text-neutral-900">${feedbackData.total_feedbacks || 0}</p>
+                                    <p class="text-xs text-neutral-500">总反馈数</p>
+                                </div>
+                                <div class="bg-green-50 p-3 rounded-lg border border-green-100 text-center">
+                                    <p class="text-2xl font-semibold text-green-700">${feedbackData.solved_count || 0}</p>
+                                    <p class="text-xs text-green-600">已解决</p>
+                                </div>
+                                <div class="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
+                                    <p class="text-2xl font-semibold text-red-700">${feedbackData.unsolved_count || 0}</p>
+                                    <p class="text-xs text-red-600">未解决</p>
+                                </div>
+                                <div class="bg-blue-50 p-3 rounded-lg border border-blue-100 text-center">
+                                    <p class="text-2xl font-semibold text-blue-700">${feedbackData.solved_rate || 0}%</p>
+                                    <p class="text-xs text-blue-600">解决率</p>
+                                </div>
+                            </div>
+                        </div>
+                `;
+                
+                // 添加已解决反馈
+                if (feedbackData.solved_feedbacks && feedbackData.solved_feedbacks.length > 0) {
+                    html += `
+                        <!-- 已解决反馈 -->
+                        <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                            <h4 class="text-sm font-medium text-neutral-900 mb-3">
+                                <span class="flex items-center">
+                                    <i class="fa fa-check-circle text-green-500 mr-2"></i>
+                                    已解决反馈 (${feedbackData.solved_feedbacks.length})
+                                </span>
+                            </h4>
+                            <div class="space-y-3">
+                    `;
+                    
+                    feedbackData.solved_feedbacks.forEach(feedback => {
+                        const timestamp = new Date(feedback.timestamp).toLocaleString('zh-CN');
+                        html += `
+                            <div class="bg-white p-3 rounded-lg border border-neutral-100">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-xs font-medium text-neutral-900">Query ID: ${feedback.query_id}</p>
+                                        <p class="text-xs text-neutral-500">${timestamp}</p>
+                                    </div>
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">已解决</span>
+                                </div>
+                                <p class="text-sm text-neutral-700 mb-2">用户反馈:</p>
+                                <p class="text-sm text-neutral-600 bg-neutral-50 p-2 rounded">${feedback.additional_info || '无反馈内容'}</p>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // 添加未解决反馈
+                if (feedbackData.unsolved_feedbacks && feedbackData.unsolved_feedbacks.length > 0) {
+                    html += `
+                        <!-- 未解决反馈 -->
+                        <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                            <h4 class="text-sm font-medium text-neutral-900 mb-3">
+                                <span class="flex items-center">
+                                    <i class="fa fa-times-circle text-red-500 mr-2"></i>
+                                    未解决反馈 (${feedbackData.unsolved_feedbacks.length})
+                                </span>
+                            </h4>
+                            <div class="space-y-3">
+                    `;
+                    
+                    feedbackData.unsolved_feedbacks.forEach(feedback => {
+                        const timestamp = new Date(feedback.timestamp).toLocaleString('zh-CN');
+                        html += `
+                            <div class="bg-white p-3 rounded-lg border border-neutral-100">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-xs font-medium text-neutral-900">Query ID: ${feedback.query_id}</p>
+                                        <p class="text-xs text-neutral-500">${timestamp}</p>
+                                    </div>
+                                    <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">未解决</span>
+                                </div>
+                                <p class="text-sm text-neutral-700 mb-2">用户反馈:</p>
+                                <p class="text-sm text-neutral-600 bg-neutral-50 p-2 rounded">${feedback.additional_info || '无反馈内容'}</p>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // 无反馈时的提示
+                if (!feedbackData.solved_feedbacks || feedbackData.solved_feedbacks.length === 0 && 
+                    !feedbackData.unsolved_feedbacks || feedbackData.unsolved_feedbacks.length === 0) {
+                    html += `
+                        <div class="text-center py-8 text-neutral-400">
+                            <i class="fa fa-comment-o text-4xl mb-4"></i>
+                            <p class="text-sm">暂无反馈数据</p>
+                        </div>
+                    `;
+                }
+                
+                html += `</div>`;
+                
+                feedbackContent.innerHTML = html;
+            } catch (error) {
+                console.error('获取反馈详情失败:', error);
+                feedbackContent.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fa fa-exclamation-circle text-2xl mb-2"></i><p class="text-sm">获取反馈信息失败</p></div>';
+            }
+        }
 
         // 获取知识库内容
         async function fetchKnowledgeBase() {
@@ -885,10 +1071,11 @@
                             <p class="text-2xl font-semibold text-neutral-900">正常运行</p>
                             <p class="text-xs text-neutral-500 mt-1">本地模型已加载</p>
                         </div>
-                        <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                        <div id="feedback-stats-card" class="bg-neutral-50 p-4 rounded-lg border border-neutral-200 cursor-pointer hover:bg-neutral-100 transition-all-300">
                             <h4 class="text-xs font-medium text-neutral-500 mb-2">反馈统计</h4>
                             <p class="text-2xl font-semibold text-neutral-900">${feedbackStats.total_feedbacks || 0} 条反馈</p>
                             <p class="text-xs text-neutral-500 mt-1">解决率: ${feedbackStats.solved_rate || 0}%</p>
+                            <p class="text-xs text-primary mt-1 cursor-pointer hover:underline">点击查看详情 →</p>
                         </div>
                     </div>
                     <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">

@@ -1,11 +1,12 @@
 import os
 import re
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from collections import defaultdict
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from loguru import logger
+from core.cache import QueryCacheManager
 
 class HybridRetriever:
     def __init__(self, knowledge_base):
@@ -26,6 +27,10 @@ class HybridRetriever:
         # 缓存文档内容和TF-IDF矩阵
         self.documents_cache = []
         self.tfidf_matrix = None
+        
+        # 初始化查询结果缓存管理器
+        self.query_cache = QueryCacheManager()
+        
         self._build_keyword_index()
     
     def _build_keyword_index(self):
@@ -109,6 +114,18 @@ class HybridRetriever:
     def hybrid_retrieval(self, query: str, top_k: int = 5) -> List[Dict]:
         """混合检索"""
         try:
+            # 构建检索参数用于缓存键生成
+            retrieval_params = {
+                "vector_weight": self.vector_weight,
+                "keyword_weight": self.keyword_weight,
+                "top_k": top_k
+            }
+            
+            # 尝试从缓存获取结果
+            cached_results = self.query_cache.get(query, retrieval_params)
+            if cached_results is not None:
+                return cached_results
+            
             # 执行两种检索
             vector_results = self.vector_retrieval(query, top_k * 2)
             keyword_results = self.keyword_retrieval(query, top_k * 2)
@@ -143,6 +160,9 @@ class HybridRetriever:
                 result["score"] = score
                 final_results.append(result)
             
+            # 将结果存入缓存
+            self.query_cache.set(query, retrieval_params, final_results)
+            
             logger.info(f"混合检索完成，返回 {len(final_results)} 个结果")
             return final_results
         except Exception as e:
@@ -162,3 +182,17 @@ class HybridRetriever:
         self.vector_weight = vector_weight
         self.keyword_weight = keyword_weight
         logger.info(f"检索权重已调整: 向量={vector_weight}, 关键词={keyword_weight}")
+    
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """获取缓存统计信息"""
+        return self.query_cache.get_stats()
+    
+    def clear_cache(self):
+        """清空查询结果缓存"""
+        self.query_cache.clear()
+        logger.info("查询结果缓存已清空")
+    
+    def invalidate_cache_by_query(self, query: str):
+        """使特定查询的缓存失效"""
+        self.query_cache.invalidate_by_query(query)
+        logger.info(f"查询 '{query[:50]}...' 的缓存已失效")

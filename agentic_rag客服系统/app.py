@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -152,6 +152,39 @@ async def get_feedback_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# 获取详细反馈统计
+@app.get("/api/feedback/details")
+async def get_feedback_details(limit: int = Query(50, ge=1, le=100)):
+    try:
+        details = feedback_manager.get_feedback_details(limit)
+        return details
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 获取已解决的反馈
+@app.get("/api/feedback/solved")
+async def get_solved_feedbacks(limit: int = Query(50, ge=1, le=100)):
+    try:
+        solved_feedbacks = feedback_manager.get_feedbacks_by_status(True)
+        return {
+            "count": len(solved_feedbacks),
+            "feedbacks": solved_feedbacks[:limit]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 获取未解决的反馈
+@app.get("/api/feedback/unsolved")
+async def get_unsolved_feedbacks(limit: int = Query(50, ge=1, le=100)):
+    try:
+        unsolved_feedbacks = feedback_manager.get_feedbacks_by_status(False)
+        return {
+            "count": len(unsolved_feedbacks),
+            "feedbacks": unsolved_feedbacks[:limit]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # 获取知识库统计
 @app.get("/api/documents/stats")
 async def get_documents_stats():
@@ -185,6 +218,37 @@ async def get_knowledge_base():
         }
         
         return knowledge_base_content
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 获取缓存统计信息
+@app.get("/api/cache/stats")
+async def get_cache_stats():
+    try:
+        stats = hybrid_retriever.get_cache_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 清空缓存
+@app.post("/api/cache/clear")
+async def clear_cache():
+    try:
+        hybrid_retriever.clear_cache()
+        return {"message": "缓存已清空"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 使特定查询的缓存失效
+@app.post("/api/cache/invalidate")
+async def invalidate_cache(query_data: dict):
+    try:
+        query = query_data.get("query", "")
+        if not query:
+            raise HTTPException(status_code=400, detail="查询内容不能为空")
+        
+        hybrid_retriever.invalidate_cache_by_query(query)
+        return {"message": f"查询 '{query[:50]}...' 的缓存已失效"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

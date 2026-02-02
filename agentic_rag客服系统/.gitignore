@@ -1,0 +1,55 @@
+# 虚拟环境
+venv/
+env/
+.env/
+
+# 依赖包
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 日志文件
+logs/
+*.log
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 编译文件
+*.so
+*.dylib
+*.dll
+
+# 测试文件
+pytest_cache/
+.testmondata
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 构建文件
+build/
+dist/
+*.egg-info/
+
+# 数据库文件
+*.db
+*.sqlite3
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# 测试脚本
+test_*.py
